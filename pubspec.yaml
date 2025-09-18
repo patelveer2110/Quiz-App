@@ -44,6 +44,8 @@ dependencies:
   # fl_chart: ^0.67.0
   photo_view: ^0.15.0
   just_audio: ^0.10.4
+  qr_flutter: ^4.1.0
+  csv: ^6.0.0
 
 dev_dependencies:
   flutter_test:
