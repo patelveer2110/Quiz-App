@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/quiz_service.dart';
-import '../../services/qr_service.dart';
-import 'add_question_screen.dart'; // Don't forget to import this!
+import 'add_question_screen.dart';
 
 class CreateQuizScreen extends StatefulWidget {
   const CreateQuizScreen({Key? key}) : super(key: key);
@@ -19,10 +18,9 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
   DateTime? _startTime;
   DateTime? _deadline;
   bool _loading = false;
-  String? _quizCode;
 
+  String? _quizId;
   final _quizService = QuizService();
-  final _qrService = QRService();
 
   Future<void> _pickDate(bool isStart) async {
     DateTime? picked = await showDatePicker(
@@ -62,9 +60,8 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
         _pointsController.text.isEmpty ||
         _startTime == null ||
         _deadline == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Fill all fields")));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text("Fill all fields")));
       return;
     }
 
@@ -87,89 +84,125 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
     });
 
     if (quizId != null) {
-      debugPrint("Quiz created with ID: $quizId");
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Quiz Created")));
-      // String? code = await _quizService.getQuizCode(quizId);
-      debugPrint("Navigating to AddQuestionScreen with quizId: $quizId");
-     await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) =>
-              AddQuestionScreen(quizId: quizId, totalQuestions: numQuestions),
-        ),
-      );
-      debugPrint("Returned from AddQuestionScreen");
+      _quizId = quizId;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text("Quiz Created")));
     } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Failed to create quiz")));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text("Failed to create quiz")));
     }
+  }
+
+  Future<void> _addQuestionsManually() async {
+    if (_quizId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Create the quiz first")));
+      return;
+    }
+
+    int numQuestions = int.parse(_numQuestionsController.text.trim());
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            AddQuestionScreen(quizId: _quizId!, totalQuestions: numQuestions),
+      ),
+    );
+  }
+
+  Future<void> _uploadQuestionsExcel() async {
+    if (_quizId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Create the quiz first")));
+      return;
+    }
+
+    bool success = await _quizService.addQuestionsFromExcel(_quizId!);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+            success ? "Questions imported from Excel!" : "Failed to import Excel"),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    debugPrint("Building CreateQuizScreen...");
     return Scaffold(
       appBar: AppBar(title: const Text("Create Quiz")),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            TextField(
-              controller: _titleController,
-              decoration: const InputDecoration(labelText: "Quiz Title"),
-            ),
-            TextField(
-              controller: _subjectController,
-              decoration: const InputDecoration(labelText: "Subject Name"),
-            ),
-            TextField(
-              controller: _numQuestionsController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: "Number of Questions",
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              TextField(
+                controller: _titleController,
+                decoration: const InputDecoration(labelText: "Quiz Title"),
               ),
-            ),
-            TextField(
-              controller: _pointsController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: "Points per Question",
+              TextField(
+                controller: _subjectController,
+                decoration: const InputDecoration(labelText: "Subject Name"),
               ),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () => _pickDate(true),
-                    child: const Text("Pick Start Time"),
-                  ),
+              TextField(
+                controller: _numQuestionsController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: "Number of Questions",
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () => _pickDate(false),
-                    child: const Text("Pick Deadline"),
+              ),
+              TextField(
+                controller: _pointsController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: "Points per Question",
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => _pickDate(true),
+                      child: const Text("Pick Start Time"),
+                    ),
                   ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => _pickDate(false),
+                      child: const Text("Pick Deadline"),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              _loading
+                  ? const CircularProgressIndicator()
+                  : ElevatedButton(
+                      onPressed: _createQuiz,
+                      child: const Text("Create Quiz"),
+                    ),
+              const SizedBox(height: 30),
+              if (_quizId != null) ...[
+                const Text(
+                  "Add Questions",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                const SizedBox(height: 10),
+                ElevatedButton(
+                  onPressed: _addQuestionsManually,
+                  child: const Text("Add Questions Manually"),
+                ),
+                const SizedBox(height: 10),
+                ElevatedButton(
+                  onPressed: _uploadQuestionsExcel,
+                  child: const Text("Upload Questions via Excel"),
                 ),
               ],
-            ),
-            const SizedBox(height: 20),
-            _loading
-                ? const CircularProgressIndicator()
-                : ElevatedButton(
-                    onPressed: _createQuiz,
-                    child: const Text("Create Quiz"),
-                  ),
-            if (_quizCode != null) ...[
-              const SizedBox(height: 20),
-              const Text("Quiz Created! Share this QR:"),
-              _qrService.qrWidget(_quizCode ?? ""),
             ],
-          ],
+          ),
         ),
       ),
     );

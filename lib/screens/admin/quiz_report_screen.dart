@@ -45,65 +45,71 @@ class _QuizReportScreenState extends State<QuizReportScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Quiz Report"),
-        actions: [
-          if (_isExporting)
-            const Padding(
-              padding: EdgeInsets.all(8.0),
-              child: CircularProgressIndicator(color: Colors.white),
-            )
-        ],
-      ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection("quizzes")
-            .doc(widget.quizId)
-            .collection("results")
-            .orderBy("score", descending: true)
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+  @override
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(
+      title: const Text("Quiz Report"),
+      actions: [
+        if (_isExporting)
+          const Padding(
+            padding: EdgeInsets.all(8.0),
+            child: CircularProgressIndicator(color: Colors.white),
+          )
+      ],
+    ),
+    body: StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection("quizResults")
+          .doc(widget.quizId)
+          .collection("participants")
+          .orderBy("timestamp", descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text("No results yet"));
-          }
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const Center(child: Text("No results yet"));
+        }
 
-          final results = snapshot.data!.docs
-              .map((doc) => doc.data() as Map<String, dynamic>)
-              .toList();
+        final results = snapshot.data!.docs
+            .map((doc) => doc.data() as Map<String, dynamic>)
+            .toList();
 
-          return Column(
-            children: [
-              Expanded(
-                child: ListView.builder(
-                  itemCount: results.length,
-                  itemBuilder: (context, index) {
-                    final res = results[index];
-                    return ListTile(
-                      title: Text(res["userName"] ?? "Unknown"),
-                      subtitle: Text(res["email"] ?? ""),
-                      trailing: Text("${res["score"]} pts"),
-                    );
-                  },
-                ),
+        return Column(
+          children: [
+            Expanded(
+              child: ListView.builder(
+                itemCount: results.length,
+                itemBuilder: (context, index) {
+                  final res = results[index];
+                  final date = (res['timestamp'] as Timestamp?)?.toDate();
+                  return ListTile(
+                    title: Text(res["userName"] ?? "Unknown User"),
+                    subtitle: date != null
+                        ? Text(
+                            "Attempted on: ${date.toLocal().toString().split('.')[0]}")
+                        : null,
+                    trailing: Text("${res["score"]} / ${res["total"]}"),
+                  );
+                },
               ),
-              Padding(
-                padding: const EdgeInsets.all(10),
-                child: ElevatedButton.icon(
-                  icon: const Icon(Icons.download),
-                  label: const Text("Export as CSV"),
-                  onPressed: () => _exportToCSV(results),
-                ),
-              )
-            ],
-          );
-        },
-      ),
-    );
-  }
+            ),
+            Padding(
+              padding: const EdgeInsets.all(10.0),
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.download),
+                label: const Text("Download CSV"),
+                onPressed: () => _exportToCSV(results),
+              ),
+            )
+          ],
+        );
+      },
+    ),
+  );
+}
+
 }

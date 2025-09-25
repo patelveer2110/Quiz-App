@@ -2,6 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/quiz_model.dart';
 import '../models/question_model.dart';
 import 'dart:math';
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
+import 'package:excel/excel.dart';
 
 class QuizService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -46,36 +49,73 @@ class QuizService {
     }
   }
 
-  // Add question to quiz
-Future<bool> addQuestion({
-  required String quizId,
-  required String question,
-  required List<String> options,
-  required int correctOptionIndex,
-}) async {
-  print("Adding question to quiz: $quizId");
-  print("Question: $question");
-  print("Options: $options");
-  print("Correct option index: $correctOptionIndex");
-  try {
-    await _firestore
-        .collection('quizzes')
-        .doc(quizId)
-        .collection('questions')
-        .add({
-          'question': question,
-          'options': options,
-          'correctOptionIndex': correctOptionIndex,
-        });
-    print("Question added successfully");
-    return true;
-  } catch (e) {
-    print('Add question error: $e');
-    return false;
+  // Add single question to quiz
+  Future<bool> addQuestion({
+    required String quizId,
+    required String question,
+    required List<String> options,
+    required int correctOptionIndex,
+  }) async {
+    try {
+      await _firestore
+          .collection('quizzes')
+          .doc(quizId)
+          .collection('questions')
+          .add({
+        'question': question,
+        'options': options,
+        'correctOptionIndex': correctOptionIndex,
+      });
+      return true;
+    } catch (e) {
+      print('Add question error: $e');
+      return false;
+    }
   }
-}
 
+  // Upload questions from Excel
+  Future<bool> addQuestionsFromExcel(String quizId) async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['xlsx'],
+      );
 
+      if (result == null) return false; // User canceled
+
+      File file = File(result.files.single.path!);
+      var bytes = file.readAsBytesSync();
+      var excel = Excel.decodeBytes(bytes);
+
+      Sheet sheet = excel.sheets.values.first;
+
+      for (int rowIndex = 1; rowIndex < sheet.maxRows; rowIndex++) {
+        var row = sheet.row(rowIndex);
+        String question = row[0]?.value.toString() ?? "";
+        List<String> options = [
+          row[1]?.value.toString() ?? "",
+          row[2]?.value.toString() ?? "",
+          row[3]?.value.toString() ?? "",
+          row[4]?.value.toString() ?? "",
+        ];
+        int correctIndex = int.tryParse(row[5]?.value.toString() ?? "0") ?? 0;
+
+        if (question.isEmpty || options.any((o) => o.isEmpty)) continue;
+
+        await addQuestion(
+          quizId: quizId,
+          question: question,
+          options: options,
+          correctOptionIndex: correctIndex,
+        );
+      }
+
+      return true;
+    } catch (e) {
+      print("Excel upload error: $e");
+      return false;
+    }
+  }
 
   // Get quiz by code
   Future<QuizModel?> getQuizByCode(String code) async {
@@ -112,6 +152,4 @@ Future<bool> addQuestion({
   Future<void> deleteQuiz(String quizId) async {
     await _firestore.collection('quizzes').doc(quizId).delete();
   }
-
-  
 }

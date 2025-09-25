@@ -1,13 +1,13 @@
 class QuestionModel {
   final String questionId;
-  final String questionText;
+  final String question; // renamed from questionText
   final List<String> options;
-  final int correctOptionIndex; // index of correct answer in options list
-  final String? imageUrl; // optional image for question
+  final int correctOptionIndex;
+  final String? imageUrl;
 
   QuestionModel({
     required this.questionId,
-    required this.questionText,
+    required this.question,
     required this.options,
     required this.correctOptionIndex,
     this.imageUrl,
@@ -17,7 +17,7 @@ class QuestionModel {
   factory QuestionModel.fromMap(Map<String, dynamic> data, String documentId) {
     return QuestionModel(
       questionId: documentId,
-      questionText: data['questionText'] ?? '',
+      question: data['question'] ?? '', // updated field name
       options: List<String>.from(data['options'] ?? []),
       correctOptionIndex: data['correctOptionIndex'] ?? 0,
       imageUrl: data['imageUrl'],
@@ -27,7 +27,7 @@ class QuestionModel {
   // To Firestore
   Map<String, dynamic> toMap() {
     return {
-      'questionText': questionText,
+      'question': question, // updated field name
       'options': options,
       'correctOptionIndex': correctOptionIndex,
       'imageUrl': imageUrl,
